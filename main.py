@@ -1,6 +1,6 @@
 import argparse
 import json
-
+# import run
 import torch.cuda
 
 
@@ -24,4 +24,6 @@ def get_parser():
 
 
 if __name__ == '__main__':
-    get_parser()
+    args = get_parser()
+    print(args.device)
+    # run(args)

@@ -7,15 +7,26 @@
 # @Software: PyCharm
 
 import cv2
-import numpy as np
 import pandas as pd
 import torch
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix
+
+
+class Anchor:
+    def __init__(self, x1, y1, x2, y2):
+        self.x1 = x1
+        self.y1 = y1
+        self.x2 = x2
+        self.y2 = y2
+
 
 cls_list = ['aeroplane', 'bicycle', 'bird', 'boat', 'bottle',
             'bus', 'car', 'cat', 'chair', 'cow', 'diningtable', 'dog',
             'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa',
             'train', 'tvmonitor']
-
 
 
 def index2whctr(x1, y1, x2, y2):
@@ -63,7 +74,7 @@ def get_yolo_bbox(x1, y1, x2, y2, img_w=448, img_h=448, split=7.):
 
     w = w / img_w
     h = h / img_h
-    index = ((i-1) * 7 + j) - 1
+    index = ((i - 1) * 7 + j) - 1
     return w, h, center_x, center_y, index
 
 
@@ -135,3 +146,90 @@ def yolo2xyxy(output, split=7, img_w=448, img_h=448):
         x1, y1, x2, y2 = center_x - w / 2, center_y - h / 2, center_x + w / 2, center_y + h / 2
         bboxes.append([x1, x2, y1, y2])
     return bboxes, lbles
+
+
+def iou(logit, label):
+    A = Anchor(logit[0], logit[1], logit[2], logit[3])
+    B = Anchor(label[0], label[1], label[2], label[3])
+
+    inner_w = min(A.x2, B.x2) - max(A.x1, B.x1)
+    inner_h = min(A.x2, B.x2) - max(A.x1, B.x1)
+    inner = 0 if inner_h * inner_w <= 0 else inner_h * inner_w
+
+    outer = (A.x2 - A.x1) * (A.y2 - A.y1) + (B.x2 - B.x1) * (B.y2 - B.y1) - inner
+
+    return inner / outer
+
+
+def calculate_accuracy(logits, targets):
+    return None
+
+
+def draw_plot_images(train_acc_list: list,
+                     value_acc_list: list,
+                     train_loss_list: list,
+                     value_loss_list: list,
+                     save_dir: str):
+    if not os.path.isdir(save_dir):
+        os.mkdir(save_dir)
+
+    plt.plot(train_acc_list, 's--', color='r', label='train_acc')
+    plt.plot(value_acc_list, 'o--', color='g', label='value_acc')
+    plt.xlabel('length')
+    plt.ylabel('accuracy')
+    plt.legend()
+    plt.savefig(os.path.join(save_dir, 'acc.jpg'))
+    plt.show()
+
+    plt.plot(train_loss_list, 's--', color='r', label='train_loss')
+    plt.plot(value_loss_list, 'o--', color='g', label='value_loss')
+    plt.xlabel('length')
+    plt.ylabel('loss')
+    plt.legend()
+    plt.savefig(os.path.join(save_dir, 'loss.jpg'))
+    plt.show()
+
+
+def plot_confusion_matrix(cm, labels_name, title):
+    cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+    plt.imshow(cm, interpolation='nearest')
+    plt.title(title)
+    plt.colorbar()
+    num_local = np.array(range(len(labels_name)))
+    plt.xticks(num_local, labels_name, rotation=90)
+    plt.yticks(num_local, labels_name)
+    plt.ylabel('True label')
+    plt.xlabel('Predict label')
+
+
+def create_confuse_matrix(logits, labels):
+    if type(logits) is torch.Tensor:
+        logits = np.asanyarray(logits)
+    if type(labels) is torch.Tensor:
+        labels = np.asanyarray(labels)
+    if np.unique(logits) is [0, 1]:
+        logits = np.argmax(logits, -1).view(-1)
+    if np.unique(labels) is [0, 1]:
+        labels = np.argmax(labels, -1).view(-1)
+
+    return confusion_matrix(labels, logits)
+
+# debug
+# draw_plot_images([1, 2, 3, 4, 5],
+#                  [2, 3, 4, 5, 6],
+#                  [5, 4, 3, 2, 1],
+#                  [6, 5, 4, 3, 2],
+#                  './ckpt_dir'
+#                  )
+
+# print(iou([1, 1, 500, 500], [1, 1, 500, 500]))
+
+# a = torch.randint(1, 10, [300])
+# test_y =torch.randint(1, 10, [1000])
+# pred_y = torch.randint(1, 10, [1000])
+#
+# cm = confusion_matrix(torch.cat([a, test_y], -1), torch.cat([a, pred_y], -1))
+# print(cm)
+#
+# plot_confusion_matrix(cm, labels_name=[1, 2, 3, 4, 5, 6, 7], title='tst')
+# plt.show()
